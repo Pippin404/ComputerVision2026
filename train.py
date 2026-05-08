@@ -248,7 +248,7 @@ def make_data_loaders(
 	seed: int,
 ):
 	train_tf, eval_tf = build_transforms(img_size=img_size)
-	train_ds = SevenSegmentDataset(train_root, transform=train_tf, max_per_label=25, seed=seed)
+	train_ds = SevenSegmentDataset(train_root, transform=train_tf, max_per_label=500, seed=seed)
 
 	if val_root is not None and val_root.exists():
 		# Use explicit validation folder when available.

@@ -17,7 +17,7 @@ import seaborn as sns
 class ValidationDataset(Dataset):
 	"""Dataset that loads images from class folders (0-9)."""
 
-	def __init__(self, root: Path, transform=None, samples_per_class: int = 29):
+	def __init__(self, root: Path, transform=None, samples_per_class: int | None = None):
 		self.root = root
 		self.transform = transform
 		self.samples = []
@@ -438,8 +438,8 @@ def parse_args():
 	parser.add_argument(
 		"--samples-per-class",
 		type=int,
-		default=29,
-		help="Number of samples to evaluate per class for digits 0-9.",
+		default=None,
+		help="Optional limit per class. Omit to evaluate every image in each class folder.",
 	)
 	parser.add_argument(
 		"--save-results",
