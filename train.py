@@ -170,6 +170,25 @@ def build_transforms(img_size: int = 224):
 	return train_transform, eval_transform
 
 
+def summarize_class_counts(dataset):
+	"""Return per-class sample counts for ImageFolder, SevenSegmentDataset, or Subset wrappers."""
+	if isinstance(dataset, torch.utils.data.Subset):
+		base_counts = summarize_class_counts(dataset.dataset)
+		counts = {label: 0 for label in base_counts}
+		for index in dataset.indices:
+			_, label = dataset.dataset[index]
+			counts[label] = counts.get(label, 0) + 1
+		return counts
+
+	if hasattr(dataset, "samples"):
+		counts = defaultdict(int)
+		for _, label in dataset.samples:
+			counts[label] += 1
+		return dict(counts)
+
+	raise TypeError(f"Unsupported dataset type for class summary: {type(dataset)!r}")
+
+
 def build_model(num_classes: int, pretrained: bool = False):
 	weights = models.ResNet18_Weights.DEFAULT if pretrained else None
 	model = models.resnet18(weights=weights)
@@ -211,12 +230,10 @@ def run_epoch(model, loader, criterion, optimizer, device, training: bool, epoch
 		total_correct += (preds == labels).sum().item()
 		total_count += images.size(0)
 
-		if batch_idx == 1 or batch_idx == total_batches or batch_idx % 10 == 0:
-			percent = (batch_idx / max(total_batches, 1)) * 100
-			print(
-				f"Epoch {epoch}/{epochs} [{phase}] "
-				f"batch {batch_idx}/{total_batches} ({percent:.1f}%)"
-			)
+		unique_classes = sorted(set(labels.cpu().numpy().tolist()))
+		print(
+			f"Epoch {epoch}/{epochs} [{phase}] batch {batch_idx}/{total_batches} | Classes: {unique_classes}"
+		)
 
 	avg_loss = total_loss / max(total_count, 1)
 	avg_acc = total_correct / max(total_count, 1)
@@ -235,7 +252,7 @@ def make_data_loaders(
 
 	if val_root is not None and val_root.exists():
 		# Use explicit validation folder when available.
-		val_ds = SevenSegmentDataset(val_root, transform=eval_tf)
+		val_ds = SevenSegmentDataset(val_root, transform=eval_tf, max_per_label=25, seed=seed)
 	else:
 		# Fallback to split training data if no validation folder is provided.
 		eval_train_ds = SevenSegmentDataset(train_root, transform=eval_tf)
@@ -258,6 +275,8 @@ def make_data_loaders(
 	pin_memory = torch.cuda.is_available()
 	train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=pin_memory)
 	val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=pin_memory)
+	print(f"Train class counts: {summarize_class_counts(train_ds)}")
+	print(f"Validation class counts: {summarize_class_counts(val_ds)}")
 	return train_loader, val_loader
 
 
